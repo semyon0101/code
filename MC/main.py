@@ -11,36 +11,6 @@ x_fov_r = math.radians(x_fov_d)
 y_fov_r = math.radians(y_fov_d)
 
 
-def rot(pos_object: [float, float, float], pos_player: [float, float, float], x_angle, y_angle):
-    pos_object = pos_object.copy()
-    pos_object[0] -= pos_player[0]
-    pos_object[1] -= pos_player[1]
-    pos_object[2] -= pos_player[2]
-
-    if pos_object[0] == 0 and pos_object[1] == 0 and pos_object[2] == 0:
-        return pos_player[0], pos_player[1], pos_player[2]
-
-    angle = math.atan2(pos_object[1], pos_object[0])
-    r_x_y = math.sqrt(pos_object[0] ** 2 + pos_object[1] ** 2)
-    new_pos = [r_x_y * math.cos(math.radians(x_angle) + angle),
-               r_x_y * math.sin(math.radians(x_angle) + angle),
-               pos_object[2]]
-    x_per = 0
-    y_per = 1
-    angle_2 = math.atan2(new_pos[2], math.sqrt(new_pos[0] ** 2 + new_pos[1] ** 2))
-    if not (pos_object[0] == 0 and pos_object[1] == 0):
-        x_per = new_pos[0] / (new_pos[0] + new_pos[1])
-        y_per = new_pos[1] / (new_pos[0] + new_pos[1])
-
-    r_x_y_z = math.sqrt(new_pos[0] ** 2 + new_pos[1] ** 2 + new_pos[2] ** 2)
-    new_pos_1 = [
-        math.sqrt(round(
-            ((r_x_y_z * math.cos(math.radians(y_angle) + angle_2)) ** 2) * x_per, 12)),
-        math.sqrt(round(
-            ((r_x_y_z * math.cos(math.radians(y_angle) + angle_2)) ** 2) * y_per, 12)),
-        r_x_y_z * math.sin(math.radians(y_angle) + angle_2)]
-    return [new_pos_1[0] + pos_player[0], new_pos_1[1] + pos_player[1], new_pos_1[2] + pos_player[2]]
-
 
 def rotate_test(x, y, z, pos):
     x = math.radians(x)
