@@ -5,8 +5,8 @@ import numpy as np
 import numba
 from datetime import datetime
 
-size = [500, 500]
-x_fov_d = 60
+size = [1000, 1000]
+x_fov_d = 80
 y_fov_d = size[1] / (size[0] / x_fov_d)
 
 x_fov_r = math.radians(x_fov_d)
@@ -14,7 +14,7 @@ y_fov_r = math.radians(y_fov_d)
 
 clock = pygame.time.Clock()
 
-speed = 0.01
+speed = 0.3
 
 
 def get_object_from_file(filename):
@@ -24,7 +24,7 @@ def get_object_from_file(filename):
             if line.startswith('v '):
                 vertex.append(
                     list(
-                        rotate(0, 0, np.array([float(i) for i in line.split()[1:]]), np.array([0, 0, 0])
+                        rotate(0, -90, np.array([float(i) for i in line.split()[1:]]), np.array([0, 0, 0])
                                )
                     )
                 )
@@ -39,7 +39,7 @@ def matmul(A, B):
     C = np.array([0.0, 0.0, 0.0])
     for i in range(3):
         for j in range(3):
-            C[i] += B[j][i]*A[i]
+            C[i] += B[j][i] * A[j]
     return C
 
 
@@ -95,35 +95,37 @@ def get_pos_in_2d_plane(pos_player: np.array([float, float, float]),
 
 pygame.init()
 screen = pygame.display.set_mode(size)
-# obj = [np.array([x, y, z], np.float) for x in [0, 1] for y in [0, 1] for z in [0, 1]]
+# obj = [np.array([x, y, z], np.float32) for x in [0, 1] for y in [0, 1] for z in [0, 1]]
 
-# vertex, faces = get_object_from_file('resources/t_34_obj.obj')
+vertex, faces = get_object_from_file('resources/t_34_obj.obj')
 # vertex, faces=[[0,1,0]], [[0,0]]
-pos_pl = np.array([0, 0, 0], np.float)
-vertex = [
-    [1, -1, -1],
-    [1, 1, -1],
-    [-1, 1, -1],
-    [-1, -1, -1],
-    [1, -1, 1],
-    [1, 1, 1],
-    [-1, -1, 1],
-    [-1, 1, 1]
-    ]
-faces = [
-    [0,1],
-    [0,3],
-    [0,4],
-    [2,1],
-    [2,3],
-    [2,7],
-    [6,3],
-    [6,4],
-    [6,7],
-    [5,1],
-    [5,4],
-    [5,7]
-    ]
+pos_pl = np.array([0, 0, 0], np.float_)
+# vertex = [
+#     [1, -1, -1],
+#     [1, 1, -1],
+#     [-1, 1, -1],
+#     [-1, -1, -1],
+#     [1, -1, 1],
+#     [1, 1, 1],
+#     [-1, -1, 1],
+#     [-1, 1, 1]
+#     ]
+# faces = [
+#     [0,1],
+#     [0,3],
+#     [0,4],
+#     [2,1],
+#     [2,3],
+#     [2,7],
+#     [6,3],
+#     [6,4],
+#     [6,7],
+#     [5,1],
+#     [5,4],
+#     [5,7]
+#     ]
+
+
 x_angle, y_angle = 0, 0
 now_pos = [None, None]
 while True:
@@ -140,44 +142,44 @@ while True:
     if keys[pygame.K_a]:
         left = rotate(
             -x_angle, 0,
-            np.array([-speed, 0, 0], np.float), np.array([0, 0, 0], np.float))
+            np.array([-speed, 0, 0], np.float_), np.array([0, 0, 0], np.float_))
         pos_pl += left
     if keys[pygame.K_d]:
         right = rotate(
             -x_angle, 0,
-            np.array([speed, 0, 0], np.float), np.array([0, 0, 0], np.float))
+            np.array([speed, 0, 0], np.float_), np.array([0, 0, 0], np.float_))
         pos_pl += right
     if keys[pygame.K_s]:
         back = rotate(
             0, -y_angle,
-            np.array([0, -speed, 0], np.float), np.array([0, 0, 0], np.float))
+            np.array([0, -speed, 0], np.float_), np.array([0, 0, 0], np.float_))
         back = rotate(
             -x_angle, 0,
-            back, np.array([0, 0, 0], np.float))
+            back, np.array([0, 0, 0], np.float_))
         pos_pl += back
     if keys[pygame.K_w]:
         forward = rotate(
             0, -y_angle,
-            np.array([0, speed, 0], np.float), np.array([0, 0, 0], np.float))
+            np.array([0, speed, 0], np.float_), np.array([0, 0, 0], np.float_))
         forward = rotate(
             -x_angle, 0,
-            forward, np.array([0, 0, 0], np.float))
+            forward, np.array([0, 0, 0], np.float_))
         pos_pl += forward
     if keys[pygame.K_e]:
         down = rotate(
             0, -y_angle,
-            np.array([0, 0, speed], np.float), np.array([0, 0, 0], np.float))
+            np.array([0, 0, speed], np.float_), np.array([0, 0, 0], np.float_))
         down = rotate(
             -x_angle, 0,
-            down, np.array([0, 0, 0], np.float))
+            down, np.array([0, 0, 0], np.float_))
         pos_pl += down
     if keys[pygame.K_q]:
         up = rotate(
             0, -y_angle,
-            np.array([0, 0, -speed], np.float), np.array([0, 0, 0], np.float))
+            np.array([0, 0, -speed], np.float_), np.array([0, 0, 0], np.float_))
         up = rotate(
             -x_angle, 0,
-            up, np.array([0, 0, 0], np.float))
+            up, np.array([0, 0, 0], np.float_))
         pos_pl += up
 
     if pygame.mouse.get_pressed(3)[0]:
@@ -192,8 +194,8 @@ while True:
 
     arr2D = []
     for pos_obj in vertex:
-        answer = get_pos_in_2d_plane(np.array(pos_pl, np.float),
-                                     np.array(pos_obj, np.float),
+        answer = get_pos_in_2d_plane(np.array(pos_pl, np.float_),
+                                     np.array(pos_obj, np.float_),
                                      x_angle, y_angle, np.array(size), x_fov_r, y_fov_r)
         arr2D.append(answer)
     for face in faces:
@@ -202,5 +204,5 @@ while True:
     pygame.display.update()
     screen.fill((0, 0, 0))
 
-    clock.tick()
+    clock.tick(60)
     pygame.display.set_caption(str(clock.get_fps()))
