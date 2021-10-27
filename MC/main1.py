@@ -34,61 +34,6 @@ def l(x, y, x1=0, y1=0):
 
 
 @numba.njit(fastmath=True)
-def get_2d_arr(face, size):
-    faces1 = [[[1,2],[1,2]]]
-    faces1[0].pop()
-    for f1 in face:
-        x = f1[0]
-        y = f1[1]
-        for f2 in face:
-            x1 = f2[0]
-            y1 = f2[1]
-            l1 = l(x, y, x1, y1)
-            l2 = l(x, y, -x1, -y1 + size[1])
-            l3 = l(x, y, -x1, -y1 - size[1])
-            l4 = l(x, y, -x1 + size[0], -y1)
-            l5 = l(x, y, -x1 - size[0], -y1)
-            if l1 == min([l1, l2, l3, l4, l5]):
-                break
-            elif l2 == min([l1, l2, l3, l4, l5]):
-                faces2 = []
-                for x2, y2 in face:
-                    if not (x2 == x1 and y2 == y1):
-                        faces2.append([x2, y2])
-                    else:
-                        faces2.append([-x1, -y1 + size[1]])
-                np.append(faces1, faces2)
-            elif l3 == min([l1, l2, l3, l4, l5]):
-                faces2 = []
-                for x2, y2 in face:
-                    if not (x2 == x1 and y2 == y1):
-                        faces2.append([x2, y2])
-                    else:
-                        faces2.append([-x1, -y1 - size[1]])
-                np.append(faces1, faces2)
-            elif l4 == min([l1, l2, l3, l4, l5]):
-                faces2 = []
-                for x2, y2 in face:
-                    if not (x2 == x1 and y2 == y1):
-                        faces2.append([x2, y2])
-                    else:
-                        faces2.append([-x1 + size[0], -y1])
-                np.append(faces1, faces2)
-            elif l5 == min([l1, l2, l3, l4, l5]):
-                faces2 = []
-                for x2, y2 in face:
-                    if not (x2 == x1 and y2 == y1):
-                        faces2.append([x2, y2])
-                    else:
-                        faces2.append([-x1 - size[0], -y1])
-                np.append(faces1, faces2)
-
-    if faces1:
-        np.append(faces1, face)
-    return faces1
-
-
-@numba.njit(fastmath=True)
 def matmul(A, B):
     C = np.array([0.0, 0.0, 0.0])
     for i in range(3):
@@ -135,74 +80,82 @@ def get_pos_in_2d_plane(pos_player: np.array([float, float, float]),
                         pos_object: np.array([float, float, float]),
                         x_angle, y_angle, size):
     pos_object = rotate(x_angle, y_angle, pos_object, pos_player)
+    if (pos_object[1] - pos_player[1]) == 0:
+        return (pos_object[0] - pos_player[0]) * 100 + size[0] / 2, (pos_object[2] - pos_player[2]) * 100 + size[1] / 2
+
     xa = (pos_object[0] - pos_player[0]) / ((pos_object[1] - pos_player[1]) / 4)
     ya = (pos_object[2] - pos_player[2]) / ((pos_object[1] - pos_player[1]) / 4)
-    if pos_object[1] - pos_player[1] > 0:
-        x = size[0] / 2 + xa * 100
-        y = size[1] / 2 + ya * 100
-        return x, y
-    else:
-        if pos_object[0] - pos_player[0] < 0:
-            x = -size[0] / 2 - xa * 100
-            y = size[1] / 2 - ya * 100
-        else:
-            x = size[0] * 1.5 - xa * 100
-            y = size[1] / 2 - ya * 100
+    x = size[0] / 2 + xa * 100
+    y = size[1] / 2 + ya * 100
+    if pos_object[1] - pos_player[1] < 0:
+        # ang = math.degrees(math.atan2(y, x))
+        # print(ang)
+        # if 45 < ang <= 135:
+        #     x += size[0]
+        # elif -45 <= ang <= 45:
+        #     y *= -1
+        # elif -135 <= ang < -45:
+        #     y += size[1]
+        # else:
+        #     x *= -1
+        # x = (-(x - size[0] / 2))*(-pos_object[1] + pos_player[1]+1) + size[0] / 2
+        # y = (-(y - size[1] / 2))*(-pos_object[1] + pos_player[1]+1) + size[1] / 2
+        pass
 
-        return x, y
+    return x, y
 
 
 pygame.init()
 screen = pygame.display.set_mode(size)
-# obj = [np.array([x, y, z], np.float) for x in [0, 1] for y in [0, 1] for z in [0, 1]]
+# obj = [np.array([x, y, z], np.float_) for x in [0, 1] for y in [0, 1] for z in [0, 1]]
 
-vertex, faces = get_object_from_file('resources/t_34_obj.obj')
+# vertex, faces = get_object_from_file('resources/t_34_obj.obj')
 # vertex, faces=[[0,1,0]], [[0,0]]
-pos_pl = np.array([-1, -5, 0], np.float)
-# vertex = [
-#     [1, -1, -1],
-#     [1, 1, -1],
-#     [-1, 1, -1],
-#     [-1, -1, -1],
-#     [1, -1, 1],
-#     [1, 1, 1],
-#     [-1, -1, 1],
-#     [-1, 1, 1],
-#     [-1, -1, -1],
-#     [-1, 1, -1],
-#     [-3, 1, -1],
-#     [-3, -1, -1],
-#     [-1, -1, 1],
-#     [-1, 1, 1],
-#     [-3, -1, 1],
-#     [-3, 1, 1]
-# ]
-# faces = [
-#     [0, 1],
-#     [0, 3],
-#     [0, 4],
-#     [2, 1],
-#     [2, 3],
-#     [2, 7],
-#     [6, 3],
-#     [6, 4],
-#     [6, 7],
-#     [5, 1],
-#     [5, 4],
-#     [5, 7],
-#     [0 + 8, 1 + 8],
-#     [0 + 8, 3 + 8],
-#     [0 + 8, 4 + 8],
-#     [2 + 8, 1 + 8],
-#     [2 + 8, 3 + 8],
-#     [2 + 8, 7 + 8],
-#     [6 + 8, 3 + 8],
-#     [6 + 8, 4 + 8],
-#     [6 + 8, 7 + 8],
-#     [5 + 8, 1 + 8],
-#     [5 + 8, 4 + 8],
-#     [5 + 8, 7 + 8]
-# ]
+pos_pl = np.array([-1, -5, 0], np.float_)
+vertex = [
+    [1, -1, -1],
+    [1, 1, -1],
+    [-1, 1, -1],
+    [-1, -1, -1],
+    [1, -1, 1],
+    [1, 1, 1],
+    [-1, -1, 1],
+    [-1, 1, 1],
+    [-1, -1, -1],
+    [-1, 1, -1],
+    [-3, 1, -1],
+    [-3, -1, -1],
+    [-1, -1, 1],
+    [-1, 1, 1],
+    [-3, -1, 1],
+    [-3, 1, 1]
+]
+faces = [
+    [0, 1],
+    [0, 3],
+    [0, 4],
+    [2, 1],
+    [2, 3],
+    [2, 7],
+    [6, 3],
+    [6, 4],
+    [6, 7],
+    [5, 1],
+    [5, 4],
+    [5, 7],
+    [0 + 8, 1 + 8],
+    [0 + 8, 3 + 8],
+    [0 + 8, 4 + 8],
+    [2 + 8, 1 + 8],
+    [2 + 8, 3 + 8],
+    [2 + 8, 7 + 8],
+    [6 + 8, 3 + 8],
+    [6 + 8, 4 + 8],
+    [6 + 8, 7 + 8],
+    [5 + 8, 1 + 8],
+    [5 + 8, 4 + 8],
+    [5 + 8, 7 + 8]
+]
 x_angle, y_angle = 0, 0
 now_pos = [None, None]
 while True:
@@ -219,44 +172,44 @@ while True:
     if keys[pygame.K_a]:
         left = rotate(
             -x_angle, 0,
-            np.array([-speed, 0, 0], np.float), np.array([0, 0, 0], np.float))
+            np.array([-speed, 0, 0], np.float_), np.array([0, 0, 0], np.float_))
         pos_pl += left
     if keys[pygame.K_d]:
         right = rotate(
             -x_angle, 0,
-            np.array([speed, 0, 0], np.float), np.array([0, 0, 0], np.float))
+            np.array([speed, 0, 0], np.float_), np.array([0, 0, 0], np.float_))
         pos_pl += right
     if keys[pygame.K_s]:
         back = rotate(
             0, -y_angle,
-            np.array([0, -speed, 0], np.float), np.array([0, 0, 0], np.float))
+            np.array([0, -speed, 0], np.float_), np.array([0, 0, 0], np.float_))
         back = rotate(
             -x_angle, 0,
-            back, np.array([0, 0, 0], np.float))
+            back, np.array([0, 0, 0], np.float_))
         pos_pl += back
     if keys[pygame.K_w]:
         forward = rotate(
             0, -y_angle,
-            np.array([0, speed, 0], np.float), np.array([0, 0, 0], np.float))
+            np.array([0, speed, 0], np.float_), np.array([0, 0, 0], np.float_))
         forward = rotate(
             -x_angle, 0,
-            forward, np.array([0, 0, 0], np.float))
+            forward, np.array([0, 0, 0], np.float_))
         pos_pl += forward
     if keys[pygame.K_e]:
         down = rotate(
             0, -y_angle,
-            np.array([0, 0, speed], np.float), np.array([0, 0, 0], np.float))
+            np.array([0, 0, speed], np.float_), np.array([0, 0, 0], np.float_))
         down = rotate(
             -x_angle, 0,
-            down, np.array([0, 0, 0], np.float))
+            down, np.array([0, 0, 0], np.float_))
         pos_pl += down
     if keys[pygame.K_q]:
         up = rotate(
             0, -y_angle,
-            np.array([0, 0, -speed], np.float), np.array([0, 0, 0], np.float))
+            np.array([0, 0, -speed], np.float_), np.array([0, 0, 0], np.float_))
         up = rotate(
             -x_angle, 0,
-            up, np.array([0, 0, 0], np.float))
+            up, np.array([0, 0, 0], np.float_))
         pos_pl += up
 
     if pygame.mouse.get_pressed(3)[0]:
@@ -271,15 +224,14 @@ while True:
 
     arr2D = []
     for pos_obj in vertex:
-        answer = get_pos_in_2d_plane(np.array(pos_pl, np.float),
-                                     np.array(pos_obj, np.float),
+        answer = get_pos_in_2d_plane(np.array(pos_pl, np.float_),
+                                     np.array(pos_obj, np.float_),
                                      x_angle, y_angle, np.array(size))
+
         arr2D.append(answer)
+
     for face in faces:
-        print([arr2D[i] for i in face])
-        for arr in get_2d_arr(np.array([arr2D[i] for i in face]), np.array(size)):
-            print (arr)
-            pygame.draw.polygon(screen, [255, 255, 255], arr, 1)
+        pygame.draw.polygon(screen, [255, 255, 255], [arr2D[i] for i in face], 1)
 
     pygame.display.update()
     screen.fill((0, 0, 0))
