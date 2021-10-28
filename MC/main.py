@@ -4,7 +4,7 @@ import sys
 import numpy as np
 import numba
 
-size = [1000, 1000]
+size = [1000, 500]
 
 clock = pygame.time.Clock()
 
@@ -26,11 +26,6 @@ def get_object_from_file(filename):
                 faces_ = line.split()[1:]
                 faces.append([int(face_.split('/')[0]) - 1 for face_ in faces_])
     return vertex, faces
-
-
-@numba.njit(fastmath=True)
-def l(x, y, x1=0, y1=0):
-    return math.sqrt((x - x1) ** 2 + (y - y1) ** 2)
 
 
 @numba.njit(fastmath=True)
@@ -81,81 +76,70 @@ def get_pos_in_2d_plane(pos_player: np.array([float, float, float]),
                         x_angle, y_angle, size):
     pos_object = rotate(x_angle, y_angle, pos_object, pos_player)
     if (pos_object[1] - pos_player[1]) == 0:
-        return (pos_object[0] - pos_player[0]) * 100 + size[0] / 2, (pos_object[2] - pos_player[2]) * 100 + size[1] / 2
+        return (pos_object[0] - pos_player[0]) * 1000 + size[0] / 2, \
+               (pos_object[2] - pos_player[2]) * 1000 + size[1] / 2, False
+    if pos_object[1] - pos_player[1] < 0:
+        return (pos_object[0] - pos_player[0]) * 1000*max((-pos_object[1] + pos_player[1]) / 4, 1) + size[0] / 2, \
+               (pos_object[2] - pos_player[2]) * 1000*max((-pos_object[1] + pos_player[1]) / 4, 1) + size[1] / 2, True
 
-    xa = (pos_object[0] - pos_player[0]) / ((pos_object[1] - pos_player[1]) / 4)
-    ya = (pos_object[2] - pos_player[2]) / ((pos_object[1] - pos_player[1]) / 4)
+    xa = (pos_object[0] - pos_player[0]) / max((pos_object[1] - pos_player[1]) / 4, 0.1)
+    ya = (pos_object[2] - pos_player[2]) / max((pos_object[1] - pos_player[1]) / 4, 0.1)
+
     x = size[0] / 2 + xa * 100
     y = size[1] / 2 + ya * 100
-    if pos_object[1] - pos_player[1] < 0:
-        # ang = math.degrees(math.atan2(y, x))
-        # print(ang)
-        # if 45 < ang <= 135:
-        #     x += size[0]
-        # elif -45 <= ang <= 45:
-        #     y *= -1
-        # elif -135 <= ang < -45:
-        #     y += size[1]
-        # else:
-        #     x *= -1
-        # x = (-(x - size[0] / 2))*(-pos_object[1] + pos_player[1]+1) + size[0] / 2
-        # y = (-(y - size[1] / 2))*(-pos_object[1] + pos_player[1]+1) + size[1] / 2
-        pass
-
-    return x, y
+    return x, y, False
 
 
 pygame.init()
 screen = pygame.display.set_mode(size)
 # obj = [np.array([x, y, z], np.float_) for x in [0, 1] for y in [0, 1] for z in [0, 1]]
 
-# vertex, faces = get_object_from_file('resources/t_34_obj.obj')
-# vertex, faces=[[0,1,0]], [[0,0]]
+vertex, faces = get_object_from_file('resources/t_34_obj.obj')
 pos_pl = np.array([-1, -5, 0], np.float_)
-vertex = [
-    [1, -1, -1],
-    [1, 1, -1],
-    [-1, 1, -1],
-    [-1, -1, -1],
-    [1, -1, 1],
-    [1, 1, 1],
-    [-1, -1, 1],
-    [-1, 1, 1],
-    [-1, -1, -1],
-    [-1, 1, -1],
-    [-3, 1, -1],
-    [-3, -1, -1],
-    [-1, -1, 1],
-    [-1, 1, 1],
-    [-3, -1, 1],
-    [-3, 1, 1]
-]
-faces = [
-    [0, 1],
-    [0, 3],
-    [0, 4],
-    [2, 1],
-    [2, 3],
-    [2, 7],
-    [6, 3],
-    [6, 4],
-    [6, 7],
-    [5, 1],
-    [5, 4],
-    [5, 7],
-    [0 + 8, 1 + 8],
-    [0 + 8, 3 + 8],
-    [0 + 8, 4 + 8],
-    [2 + 8, 1 + 8],
-    [2 + 8, 3 + 8],
-    [2 + 8, 7 + 8],
-    [6 + 8, 3 + 8],
-    [6 + 8, 4 + 8],
-    [6 + 8, 7 + 8],
-    [5 + 8, 1 + 8],
-    [5 + 8, 4 + 8],
-    [5 + 8, 7 + 8]
-]
+# vertex = [
+#     [1, -1, -1],
+#     [1, 1, -1],
+#     [-1, 1, -1],
+#     [-1, -1, -1],
+#     [1, -1, 1],
+#     [1, 1, 1],
+#     [-1, -1, 1],
+#     [-1, 1, 1],
+#     [-1, -1, -1],
+#     [-1, 1, -1],
+#     [-3, 1, -1],
+#     [-3, -1, -1],
+#     [-1, -1, 1],
+#     [-1, 1, 1],
+#     [-3, -1, 1],
+#     [-3, 1, 1]
+# ]
+# faces = [
+#     [0, 1],
+#     [0, 3],
+#     [0, 4],
+#     [2, 1],
+#     [2, 3],
+#     [2, 7],
+#     [6, 3],
+#     [6, 4],
+#     [6, 7],
+#     [5, 1],
+#     [5, 4],
+#     [5, 7],
+#     [0 + 8, 1 + 8],
+#     [0 + 8, 3 + 8],
+#     [0 + 8, 4 + 8],
+#     [2 + 8, 1 + 8],
+#     [2 + 8, 3 + 8],
+#     [2 + 8, 7 + 8],
+#     [6 + 8, 3 + 8],
+#     [6 + 8, 4 + 8],
+#     [6 + 8, 7 + 8],
+#     [5 + 8, 1 + 8],
+#     [5 + 8, 4 + 8],
+#     [5 + 8, 7 + 8]
+# ]
 x_angle, y_angle = 0, 0
 now_pos = [None, None]
 while True:
@@ -231,7 +215,16 @@ while True:
         arr2D.append(answer)
 
     for face in faces:
-        pygame.draw.polygon(screen, [255, 255, 255], [arr2D[i] for i in face], 1)
+        arr = [arr2D[i] for i in face]
+        a = True
+        for i in range(len(arr)):
+            if not arr[i][2]:
+                a = False
+            arr[i] = arr[i][:2]
+        if a:
+            continue
+
+        pygame.draw.polygon(screen, [255, 255, 255], arr, 1)
 
     pygame.display.update()
     screen.fill((0, 0, 0))
