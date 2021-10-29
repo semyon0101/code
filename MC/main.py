@@ -4,7 +4,7 @@ import sys
 import numpy as np
 import numba
 
-size = [1000, 500]
+size = np.array([1500, 1000])
 
 clock = pygame.time.Clock()
 
@@ -25,7 +25,33 @@ def get_object_from_file(filename):
             elif line.startswith('f'):
                 faces_ = line.split()[1:]
                 faces.append([int(face_.split('/')[0]) - 1 for face_ in faces_])
-    return vertex, faces
+    return np.array(vertex), faces
+
+
+def normalise(_arr, size):
+    new_arr = []
+    a = True
+    for i in range(len(_arr)):
+        if not _arr[i][2]:
+            a = False
+    if a:
+        return None
+
+    for i in range(len(_arr)):
+        x, y, b = _arr[i]
+        if not b:
+            new_arr.append([x, y])
+        else:
+            if not _arr[(i - 1) % len(_arr)][2]:
+                x1, y1 = _arr[(i - 1) % len(_arr)][:2]
+                x2, y2 = (x1 - size[0] / 2 + x - size[0] / 2) / 2, (y1 - size[1] / 2 + y - size[1] / 2) / 2
+                new_arr.append([x2 * 1000 + size[0] / 2, y2 * 1000 + size[1] / 2])
+            if not _arr[(i + 1) % len(_arr)][2]:
+                x1, y1 = _arr[(i + 1) % len(_arr)][:2]
+                x2, y2 = (x1 - size[0] / 2 + x - size[0] / 2) / 2, (y1 - size[1] / 2 + y - size[1] / 2) / 2
+                new_arr.append([x2 * 1000 + size[0] / 2, y2 * 1000 + size[1] / 2])
+
+    return new_arr
 
 
 @numba.njit(fastmath=True)
@@ -76,26 +102,22 @@ def get_pos_in_2d_plane(pos_player: np.array([float, float, float]),
                         x_angle, y_angle, size):
     pos_object = rotate(x_angle, y_angle, pos_object, pos_player)
     if (pos_object[1] - pos_player[1]) == 0:
-        return (pos_object[0] - pos_player[0]) * 1000 + size[0] / 2, \
-               (pos_object[2] - pos_player[2]) * 1000 + size[1] / 2, False
-    if pos_object[1] - pos_player[1] < 0:
-        return (pos_object[0] - pos_player[0]) * 1000*max((-pos_object[1] + pos_player[1]) / 4, 1) + size[0] / 2, \
-               (pos_object[2] - pos_player[2]) * 1000*max((-pos_object[1] + pos_player[1]) / 4, 1) + size[1] / 2, True
+        return (pos_object[0] - pos_player[0]) * 10000 + size[0] / 2, \
+               (pos_object[2] - pos_player[2]) * 10000 + size[1] / 2, False
 
-    xa = (pos_object[0] - pos_player[0]) / max((pos_object[1] - pos_player[1]) / 4, 0.1)
-    ya = (pos_object[2] - pos_player[2]) / max((pos_object[1] - pos_player[1]) / 4, 0.1)
+    xa = (pos_object[0] - pos_player[0]) / (max(abs(pos_object[1] - pos_player[1]), 0.01) / 4)
+    ya = (pos_object[2] - pos_player[2]) / (max(abs(pos_object[1] - pos_player[1]), 0.01) / 4)
 
     x = size[0] / 2 + xa * 100
     y = size[1] / 2 + ya * 100
-    return x, y, False
+    return x, y, pos_object[1] - pos_player[1] < 0
 
 
 pygame.init()
 screen = pygame.display.set_mode(size)
-# obj = [np.array([x, y, z], np.float_) for x in [0, 1] for y in [0, 1] for z in [0, 1]]
 
 vertex, faces = get_object_from_file('resources/t_34_obj.obj')
-pos_pl = np.array([-1, -5, 0], np.float_)
+pos_pl = np.array([0.5, 0.5, -0.35], np.float_)
 # vertex = [
 #     [1, -1, -1],
 #     [1, 1, -1],
@@ -140,10 +162,24 @@ pos_pl = np.array([-1, -5, 0], np.float_)
 #     [5 + 8, 4 + 8],
 #     [5 + 8, 7 + 8]
 # ]
-x_angle, y_angle = 0, 0
+# vertex = [
+#     [0, 0, 0],
+#     [0, 1, 0],
+#     [1, 1, 0],
+#     [1, 0, 0],
+# ]
+# faces = [
+#     [0, 1, 2, 3]
+# ]
+# faces = [
+#     [0, 1],
+#     [1, 2],
+#     [2, 3],
+#     [3, 0]
+# ]
+x_angle, y_angle = -90, -30
 now_pos = [None, None]
 while True:
-    # print(x_angle, y_angle)
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
@@ -208,23 +244,16 @@ while True:
 
     arr2D = []
     for pos_obj in vertex:
-        answer = get_pos_in_2d_plane(np.array(pos_pl, np.float_),
-                                     np.array(pos_obj, np.float_),
-                                     x_angle, y_angle, np.array(size))
-
-        arr2D.append(answer)
+        arr2D.append(
+            get_pos_in_2d_plane(pos_pl,
+                                pos_obj.copy(),
+                                x_angle, y_angle, size)
+        )
 
     for face in faces:
-        arr = [arr2D[i] for i in face]
-        a = True
-        for i in range(len(arr)):
-            if not arr[i][2]:
-                a = False
-            arr[i] = arr[i][:2]
-        if a:
-            continue
-
-        pygame.draw.polygon(screen, [255, 255, 255], arr, 1)
+        answer = normalise([arr2D[i] for i in face], size)
+        if answer:
+            pygame.draw.polygon(screen, [255, 255, 255], answer, 1)
 
     pygame.display.update()
     screen.fill((0, 0, 0))
