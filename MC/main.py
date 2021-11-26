@@ -1,288 +1,189 @@
-import math
+from OpenGL.GL import *
+from OpenGL.GLU import *
 import pygame
 import sys
+from ctypes import *
 import numpy as np
-import numba
+import math
 
-size = np.array([1000, 500])
+size = [1000, 500]
 
-clock = pygame.time.Clock()
+player_pos = [0, 0, -60]
+player_angle = [0, 0]
+speed = 1
 
-speed = 0.5
-
-fast_mode = False
-
-
-def get_object_from_file(filename):
-    _vertex, _faces = [], []
-    with open(filename) as f:
-        m = 0
-        for line in f:
-            if line.startswith('v '):
-                _vertex.append(
-                    list(
-                        rotate(0, -90, np.array([float(i) for i in line.split()[1:]]), np.array([0, 0, 0])
-                               )
-                    )
-                )
-            elif line.startswith('f'):
-                faces_ = line.split()[1:]
-                _arr = [int(face_.split('/')[0]) - 1 for face_ in faces_]
-                _faces.append(_arr)
-                if m < len(_arr):
-                    m = len(_arr)
-    faces_2 = np.zeros([len(_faces), m])
-    for i in range(len(_faces)):
-        face = _faces[i]
-        for j in range(m):
-            if len(face) > j:
-                faces_2[i][j] = face[j]
-            else:
-                faces_2[i][j] = -1
-    return np.array(_vertex), faces_2
+now_pos = [None, None]
 
 
-@numba.njit(fastmath=True)
-def normalise(_arr, _size):
-    new_arr = []
-    a = True
-    for i in range(len(_arr)):
-        if not bool(_arr[i][2]):
-            a = False
-    if a:
-        return [[0.0, 0.0]], False
-
-    for i in range(len(_arr)):
-        x, y, b = _arr[i]
-        if not bool(b):
-            new_arr.append([x, y])
-        else:
-            if not _arr[(i - 1) % len(_arr)][2]:
-                x1, y1 = _arr[(i - 1) % len(_arr)][:2]
-                x2, y2 = (x1 - _size[0] / 2 + x - _size[0] / 2) / 2, (y1 - _size[1] / 2 + y - _size[1] / 2) / 2
-                new_arr.append([x2 * 1000 + _size[0] / 2, y2 * 1000 + _size[1] / 2])
-            if not _arr[(i + 1) % len(_arr)][2]:
-                x1, y1 = _arr[(i + 1) % len(_arr)][:2]
-                x2, y2 = (x1 - _size[0] / 2 + x - _size[0] / 2) / 2, (y1 - _size[1] / 2 + y - _size[1] / 2) / 2
-                new_arr.append([x2 * 1000 + _size[0] / 2, y2 * 1000 + _size[1] / 2])
-
-    return new_arr, True
-
-
-@numba.njit(fastmath=True)
-def rotate(_x_angle, _y_angle,
-           _pos: np.array([float, float, float]),
-           center: np.array([float, float, float])) -> np.array([float, float, float]):
+def rotate(_x_angle, _y_angle):
     _x_angle = math.radians(_x_angle)
-    _y_angle = math.radians(_y_angle)
-
-    _pos -= center
-
-    r_x_y = math.sqrt(_pos[1] ** 2 + _pos[0] ** 2)
-    _x_angle += math.atan2(_pos[1], _pos[0])
-    _pos[0] = r_x_y * math.cos(_x_angle)
-    _pos[1] = r_x_y * math.sin(_x_angle)
+    _y_angle = math.radians(-_y_angle)
+    _pos = [0, 0, speed]
 
     _y_angle += math.atan2(_pos[2], _pos[1])
     r_y_z = math.sqrt(_pos[1] ** 2 + _pos[2] ** 2)
     _pos[1] = r_y_z * math.cos(_y_angle)
     _pos[2] = r_y_z * math.sin(_y_angle)
 
-    _pos += center
+    r_x_y = math.sqrt(_pos[2] ** 2 + _pos[0] ** 2)
+    _x_angle += math.atan2(_pos[2], _pos[0])
+    _pos[0] = r_x_y * math.cos(_x_angle)
+    _pos[2] = r_x_y * math.sin(_x_angle)
+
+
+
     return _pos
 
 
-@numba.njit(fastmath=True)
-def get_pos_in_2d_plane(pos_player: np.array([float, float, float]), _x_angle, _y_angle,
-                        _size, _vertex, _faces, _fast_mode):
-    _x_angle = math.radians(_x_angle)
-    _y_angle = math.radians(_y_angle)
-    _arr2D = []
-    for pos_object in _vertex:
-        _x_angle2 = _x_angle
-        _y_angle2 = _y_angle
-        pos_object -= pos_player
-
-        r_x_y = math.sqrt(pos_object[1] ** 2 + pos_object[0] ** 2)
-        _x_angle2 += math.atan2(pos_object[1], pos_object[0])
-        pos_object[0] = r_x_y * math.cos(_x_angle2)
-        pos_object[1] = r_x_y * math.sin(_x_angle2)
-
-        _y_angle2 += math.atan2(pos_object[2], pos_object[1])
-        r_y_z = math.sqrt(pos_object[1] ** 2 + pos_object[2] ** 2)
-        pos_object[1] = r_y_z * math.cos(_y_angle2)
-        pos_object[2] = r_y_z * math.sin(_y_angle2)
-
-        if (pos_object[1]) == 0:
-            _arr2D.append([(pos_object[0]) * 10000 + _size[0] / 2,
-                          (pos_object[2]) * 10000 + _size[1] / 2, False])
-
-        xa = (pos_object[0]) / (max(abs(pos_object[1]), 0.01) / 4)
-        ya = (pos_object[2]) / (max(abs(pos_object[1]), 0.01) / 4)
-
-        _arr2D.append([_size[0] / 2 + xa * 100,
-                      _size[1] / 2 + ya * 100,
-                      pos_object[1] < 0])
-
-    _arr = []
-    for face in _faces:
-        buffer = []
-        for i in face:
-            if i != -1:
-                buffer.append(_arr2D[int(i)])
-            else:
-                break
-        arr2, b = normalise(buffer, _size)
-        if _fast_mode:
-            if b and [0 <= x <= _size[0] and 0 <= y <= _size[1] for x, y in arr2].count(True):
-                _arr.append(arr2)
-        else:
-            if b:
-                _arr.append(arr2)
-
-    return _arr
+def get_object_from_file(filename, types):
+    _vertex, _faces = [], []
+    with open(filename) as f:
+        for line in f:
+            if line.startswith('v '):
+                _vertex.append([float(i) for i in line.split()[1:]])
+            elif line.startswith('f'):
+                _faces.append([int(face_.split('/')[0]) - 1 for face_ in line.split()[1:]])
+    _faces_2 = []
+    if types == "GL_TRIANGLES":
+        _faces_2 = []
+        for _face in _faces:
+            i = 1
+            while i + 1 <= len(_face) - 1:
+                _faces_2.append([_face[0], _face[i], _face[i + 1]])
+                i += 1
+    elif types == "GL_LINES":
+        _faces_2 = []
+        for _face in _faces:
+            i = 0
+            while i + 1 <= len(_face) - 1:
+                _faces_2.append([_face[i], _face[i + 1]])
+                i += 1
+            _faces_2.append([_face[i], _face[0]])
+    return _vertex, _faces_2
 
 
-vertex, faces = get_object_from_file('resources/t_34_obj.obj')
-pos_pl = np.array([0.5, 0.5, -0.35], np.float_)
+def init():
+    pygame.init()
 
-# vertex = [
-#     [1, -1, -1],
-#     [1, 1, -1],
-#     [-1, 1, -1],
-#     [-1, -1, -1],
-#     [1, -1, 1],
-#     [1, 1, 1],
-#     [-1, -1, 1],
-#     [-1, 1, 1],
-#     [-1, -1, -1],
-#     [-1, 1, -1],
-#     [-3, 1, -1],
-#     [-3, -1, -1],
-#     [-1, -1, 1],
-#     [-1, 1, 1],
-#     [-3, -1, 1],
-#     [-3, 1, 1]
-# ]
-# faces = [
-#     [0, 1],
-#     [0, 3],
-#     [0, 4],
-#     [2, 1],
-#     [2, 3],
-#     [2, 7],
-#     [6, 3],
-#     [6, 4],
-#     [6, 7],
-#     [5, 1],
-#     [5, 4],
-#     [5, 7],
-#     [0 + 8, 1 + 8],
-#     [0 + 8, 3 + 8],
-#     [0 + 8, 4 + 8],
-#     [2 + 8, 1 + 8],
-#     [2 + 8, 3 + 8],
-#     [2 + 8, 7 + 8],
-#     [6 + 8, 3 + 8],
-#     [6 + 8, 4 + 8],
-#     [6 + 8, 7 + 8],
-#     [5 + 8, 1 + 8],
-#     [5 + 8, 4 + 8],
-#     [5 + 8, 7 + 8]
-# ]
-# vertex = [
-#     [0, 0, 0],
-#     [0, 1, 0],
-#     [1, 1, 0],
-#     [1, 0, 0],
-# ]
-# faces = [
-#     [0, 1, 2, 3]
-# ]
-# faces = [
-#     [0, 1],
-#     [1, 2],
-#     [2, 3],
-#     [3, 0]
-# ]
-x_angle, y_angle = -90.1, -30.1
+    screen = pygame.display.set_mode(size, pygame.DOUBLEBUF | pygame.OPENGL)
+    clock = pygame.time.Clock()
 
-pygame.init()
-screen = pygame.display.set_mode(size)
+    glEnable(GL_DEPTH_TEST)
 
-now_pos = [None, None]
-while True:
+    glMatrixMode(GL_PROJECTION)
+    glLoadIdentity()
+    # glOrtho(-1, 1, -1, 1, -1, 1)
+    gluPerspective(45, 1, 0.1, 200)
+    glMatrixMode(GL_MODELVIEW)
+    glLoadIdentity()
+
+    glScalef(size[1] / size[0], 1, 1)
+
+    vertexVBO = GLuint()
+    indexEBO = GLuint()
+
+
+    glGenBuffers(1, vertexVBO)
+    glBindBuffer(GL_ARRAY_BUFFER, vertexVBO)
+    glBufferData(GL_ARRAY_BUFFER, len(vertexes) * 4, (c_float * len(vertexes))(*vertexes),
+                 GL_STATIC_DRAW)
+    glBindBuffer(GL_ARRAY_BUFFER, 0)
+
+    glGenBuffers(1, indexEBO)
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexEBO)
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, len(indexes) * 4, (c_uint * len(indexes))(*indexes),
+                 GL_STATIC_DRAW)
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+
+
+    return screen, clock, vertexVBO, indexEBO
+
+
+def event_update():
+    global now_pos
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            pygame.quit()
             sys.exit()
 
     keys = pygame.key.get_pressed()
-
-
     if keys[pygame.K_a]:
-        left = rotate(
-            -x_angle, 0,
-            np.array([-speed, 0, 0], np.float_), np.array([0, 0, 0], np.float_))
-        pos_pl += left
+        arr = rotate(player_angle[0] + 90, 0)
+        player_pos[0] -= arr[0]
+        player_pos[1] -= arr[1]
+        player_pos[2] -= arr[2]
     if keys[pygame.K_d]:
-        right = rotate(
-            -x_angle, 0,
-            np.array([speed, 0, 0], np.float_), np.array([0, 0, 0], np.float_))
-        pos_pl += right
+        arr = rotate(player_angle[0] + 90, 0)
+        player_pos[0] += arr[0]
+        player_pos[1] += arr[1]
+        player_pos[2] += arr[2]
     if keys[pygame.K_s]:
-        back = rotate(
-            0, -y_angle,
-            np.array([0, -speed, 0], np.float_), np.array([0, 0, 0], np.float_))
-        back = rotate(
-            -x_angle, 0,
-            back, np.array([0, 0, 0], np.float_))
-        pos_pl += back
+        arr = rotate(player_angle[0], player_angle[1])
+        player_pos[0] -= arr[0]
+        player_pos[1] -= arr[1]
+        player_pos[2] -= arr[2]
     if keys[pygame.K_w]:
-        forward = rotate(
-            0, -y_angle,
-            np.array([0, speed, 0], np.float_), np.array([0, 0, 0], np.float_))
-        forward = rotate(
-            -x_angle, 0,
-            forward, np.array([0, 0, 0], np.float_))
-        pos_pl += forward
+        arr = rotate(player_angle[0], player_angle[1])
+        player_pos[0] += arr[0]
+        player_pos[1] += arr[1]
+        player_pos[2] += arr[2]
     if keys[pygame.K_e]:
-        down = rotate(
-            0, -y_angle,
-            np.array([0, 0, speed], np.float_), np.array([0, 0, 0], np.float_))
-        down = rotate(
-            -x_angle, 0,
-            down, np.array([0, 0, 0], np.float_))
-        pos_pl += down
+        arr = rotate(player_angle[0], player_angle[1] - 90)
+        player_pos[0] -= arr[0]
+        player_pos[1] -= arr[1]
+        player_pos[2] -= arr[2]
     if keys[pygame.K_q]:
-        up = rotate(
-            0, -y_angle,
-            np.array([0, 0, -speed], np.float_), np.array([0, 0, 0], np.float_))
-        up = rotate(
-            -x_angle, 0,
-            up, np.array([0, 0, 0], np.float_))
-        pos_pl += up
+        arr = rotate(player_angle[0], player_angle[1] - 90)
+        player_pos[0] += arr[0]
+        player_pos[1] += arr[1]
+        player_pos[2] += arr[2]
 
     if pygame.mouse.get_pressed(3)[0]:
         if now_pos == [None, None]:
             now_pos = pygame.mouse.get_pos()
         else:
-            x_angle += (now_pos[0] - pygame.mouse.get_pos()[0]) * 0.2
-            y_angle -= (now_pos[1] - pygame.mouse.get_pos()[1]) * 0.2
+            player_angle[1] += (now_pos[1] - pygame.mouse.get_pos()[1]) * 0.2
+            player_angle[0] += (now_pos[0] - pygame.mouse.get_pos()[0]) * 0.2
             now_pos = pygame.mouse.get_pos()
+            player_angle[0] = player_angle[0] % 360
+            player_angle[1] = min(max(player_angle[1], -90), 90)
     else:
         now_pos = [None, None]
-    
-    y_angle = max(-90, min(90, y_angle))
-    x_angle = x_angle % 360
 
-    arr = get_pos_in_2d_plane(pos_pl, x_angle, y_angle, size, vertex.copy(), faces, fast_mode)
 
-    for pos in arr:
-        pygame.draw.polygon(screen, [255, 255, 255], pos, 1)
+def draw():
+    glPushMatrix()
 
-    pygame.display.update()
-    screen.fill((0, 0, 0))
+    glRotate(player_angle[1], 1, 0, 0)
+    glRotate(player_angle[0], 0, 1, 0)
+    glTranslate(*player_pos)
 
-    clock.tick(60)
+    glEnableClientState(GL_VERTEX_ARRAY)
+
+    glBindBuffer(GL_ARRAY_BUFFER, vertexVBO)
+    glVertexPointer(3, GL_FLOAT, 0, None)
+    glBindBuffer(GL_ARRAY_BUFFER, 0)
+
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexEBO)
+    glDrawElements(GL_LINES, len(indexes), GL_UNSIGNED_INT, None)
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+
+    glDisableClientState(GL_VERTEX_ARRAY)
+
+    glPopMatrix()
+
+
+vertexes, indexes = get_object_from_file("resources/t_34_obj.obj", "GL_LINES")
+
+vertexes = list(np.array(vertexes).reshape(len(vertexes) * len(vertexes[0])))
+indexes = list(np.array(indexes).reshape(len(indexes) * len(indexes[0])))
+
+screen, clock, vertexVBO, indexEBO = init()
+
+while True:
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    event_update()
+    draw()
     pygame.display.set_caption(str(clock.get_fps()))
+    pygame.display.flip()
+    clock.tick(60)
