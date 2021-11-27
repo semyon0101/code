@@ -2,37 +2,19 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 import pygame
 import sys
-from ctypes import *
-import numpy as np
-import math
+from ctypes import c_float, c_uint
+from numpy import array as np_array
+import glm
 
 size = [1000, 500]
 
-player_pos = [0, 0, -60]
-player_angle = [0, 0]
+player_pos = glm.vec3(0, 0, -60)
+player_angle = glm.vec2(0, 0)
+player_size = 100
 speed = 1
 
 now_pos = [None, None]
-
-
-def rotate(_x_angle, _y_angle):
-    _x_angle = math.radians(_x_angle)
-    _y_angle = math.radians(-_y_angle)
-    _pos = [0, 0, speed]
-
-    _y_angle += math.atan2(_pos[2], _pos[1])
-    r_y_z = math.sqrt(_pos[1] ** 2 + _pos[2] ** 2)
-    _pos[1] = r_y_z * math.cos(_y_angle)
-    _pos[2] = r_y_z * math.sin(_y_angle)
-
-    r_x_y = math.sqrt(_pos[2] ** 2 + _pos[0] ** 2)
-    _x_angle += math.atan2(_pos[2], _pos[0])
-    _pos[0] = r_x_y * math.cos(_x_angle)
-    _pos[2] = r_x_y * math.sin(_x_angle)
-
-
-
-    return _pos
+perspective = True
 
 
 def get_object_from_file(filename, types):
@@ -65,77 +47,118 @@ def get_object_from_file(filename, types):
 def init():
     pygame.init()
 
-    screen = pygame.display.set_mode(size, pygame.DOUBLEBUF | pygame.OPENGL)
-    clock = pygame.time.Clock()
+    _screen = pygame.display.set_mode(size, pygame.DOUBLEBUF | pygame.OPENGL)
+    _clock = pygame.time.Clock()
 
     glEnable(GL_DEPTH_TEST)
 
     glMatrixMode(GL_PROJECTION)
     glLoadIdentity()
-    # glOrtho(-1, 1, -1, 1, -1, 1)
-    gluPerspective(45, 1, 0.1, 200)
+    if perspective:
+        gluPerspective(45, 1, 0.1, 200)
+    else:
+        glOrtho(-40, 40, -40, 40, -100, 100)
+
     glMatrixMode(GL_MODELVIEW)
     glLoadIdentity()
 
     glScalef(size[1] / size[0], 1, 1)
 
-    vertexVBO = GLuint()
-    indexEBO = GLuint()
+    _vertexVBO = GLuint()
+    _indexEBO = GLuint()
 
-
-    glGenBuffers(1, vertexVBO)
-    glBindBuffer(GL_ARRAY_BUFFER, vertexVBO)
+    glGenBuffers(1, _vertexVBO)
+    glBindBuffer(GL_ARRAY_BUFFER, _vertexVBO)
     glBufferData(GL_ARRAY_BUFFER, len(vertexes) * 4, (c_float * len(vertexes))(*vertexes),
                  GL_STATIC_DRAW)
     glBindBuffer(GL_ARRAY_BUFFER, 0)
 
-    glGenBuffers(1, indexEBO)
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexEBO)
+    glGenBuffers(1, _indexEBO)
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexEBO)
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, len(indexes) * 4, (c_uint * len(indexes))(*indexes),
                  GL_STATIC_DRAW)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
 
-
-    return screen, clock, vertexVBO, indexEBO
+    return _screen, _clock, _vertexVBO, _indexEBO
 
 
 def event_update():
-    global now_pos
+    global now_pos, player_pos,player_size
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             sys.exit()
-
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button==4:
+                player_size*=0.9
+            elif event.button==5:
+                player_size *=1.2
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_a]:
-        arr = rotate(player_angle[0] + 90, 0)
-        player_pos[0] -= arr[0]
-        player_pos[1] -= arr[1]
-        player_pos[2] -= arr[2]
     if keys[pygame.K_d]:
-        arr = rotate(player_angle[0] + 90, 0)
-        player_pos[0] += arr[0]
-        player_pos[1] += arr[1]
-        player_pos[2] += arr[2]
+        arr = glm.rotate(
+            glm.rotate(
+                glm.vec3(speed, 0, 0),
+                glm.radians(player_angle[1]),
+                glm.vec3(-1, 0, 0)
+            ),
+            glm.radians(player_angle[0]),
+            glm.vec3(0, -1, 0)
+        )
+        player_pos -= arr
+    if keys[pygame.K_a]:
+        arr = glm.rotate(
+            glm.rotate(
+                glm.vec3(speed, 0, 0),
+                glm.radians(player_angle[1]),
+                glm.vec3(-1, 0, 0)
+            ),
+            glm.radians(player_angle[0]),
+            glm.vec3(0, -1, 0)
+        )
+        player_pos += arr
     if keys[pygame.K_s]:
-        arr = rotate(player_angle[0], player_angle[1])
-        player_pos[0] -= arr[0]
-        player_pos[1] -= arr[1]
-        player_pos[2] -= arr[2]
+        arr = glm.rotate(
+            glm.rotate(
+                glm.vec3(0, 0, speed if perspective else -speed),
+                glm.radians(player_angle[1]),
+                glm.vec3(-1, 0, 0)
+            ),
+            glm.radians(player_angle[0]),
+            glm.vec3(0, -1, 0)
+        )
+        player_pos -= arr
     if keys[pygame.K_w]:
-        arr = rotate(player_angle[0], player_angle[1])
-        player_pos[0] += arr[0]
-        player_pos[1] += arr[1]
-        player_pos[2] += arr[2]
+        arr = glm.rotate(
+            glm.rotate(
+                glm.vec3(0, 0, speed if perspective else -speed),
+                glm.radians(player_angle[1]),
+                glm.vec3(-1, 0, 0)
+            ),
+            glm.radians(player_angle[0]),
+            glm.vec3(0, -1, 0)
+        )
+        player_pos += arr
     if keys[pygame.K_e]:
-        arr = rotate(player_angle[0], player_angle[1] - 90)
-        player_pos[0] -= arr[0]
-        player_pos[1] -= arr[1]
-        player_pos[2] -= arr[2]
+        arr = glm.rotate(
+            glm.rotate(
+                glm.vec3(0, speed, 0),
+                glm.radians(player_angle[1]),
+                glm.vec3(-1, 0, 0)
+            ),
+            glm.radians(player_angle[0]),
+            glm.vec3(0, -1, 0)
+        )
+        player_pos += arr
     if keys[pygame.K_q]:
-        arr = rotate(player_angle[0], player_angle[1] - 90)
-        player_pos[0] += arr[0]
-        player_pos[1] += arr[1]
-        player_pos[2] += arr[2]
+        arr = glm.rotate(
+            glm.rotate(
+                glm.vec3(0, speed, 0),
+                glm.radians(player_angle[1]),
+                glm.vec3(-1, 0, 0)
+            ),
+            glm.radians(player_angle[0]),
+            glm.vec3(0, -1, 0)
+        )
+        player_pos -= arr
 
     if pygame.mouse.get_pressed(3)[0]:
         if now_pos == [None, None]:
@@ -150,9 +173,11 @@ def event_update():
         now_pos = [None, None]
 
 
+
+
 def draw():
     glPushMatrix()
-
+    glTranslate(0, 0, -player_size)
     glRotate(player_angle[1], 1, 0, 0)
     glRotate(player_angle[0], 0, 1, 0)
     glTranslate(*player_pos)
@@ -162,7 +187,6 @@ def draw():
     glBindBuffer(GL_ARRAY_BUFFER, vertexVBO)
     glVertexPointer(3, GL_FLOAT, 0, None)
     glBindBuffer(GL_ARRAY_BUFFER, 0)
-
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexEBO)
     glDrawElements(GL_LINES, len(indexes), GL_UNSIGNED_INT, None)
@@ -175,8 +199,8 @@ def draw():
 
 vertexes, indexes = get_object_from_file("resources/t_34_obj.obj", "GL_LINES")
 
-vertexes = list(np.array(vertexes).reshape(len(vertexes) * len(vertexes[0])))
-indexes = list(np.array(indexes).reshape(len(indexes) * len(indexes[0])))
+vertexes = list(np_array(vertexes).reshape(len(vertexes) * len(vertexes[0])))
+indexes = list(np_array(indexes).reshape(len(indexes) * len(indexes[0])))
 
 screen, clock, vertexVBO, indexEBO = init()
 
